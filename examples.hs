@@ -7,26 +7,28 @@
     <Program> -> <statements>
     <statements> -> <statement> | <statement> <statements>
     <statement> ->
-                    "create palette" <name> "["<entries>"]"
+                    "create " <name> "[" <entries> "]"
                   | "add" <name> <color>
                   | "remove" <name> <color> | "remove" <name>
-                  | "update" <name> <color>
-                  | "convert" <mode> <mode> <color> <color>
+                  | "update" <name> <updateTarget> <color>
+                  | "convert" <mode> <mode> <color> | "convert" <mode> <mode> <name>
 
                   | <transform> <target>
 
-                  | "assign" <name> <role> <color>
+                  | "assign" <name> <role> <assignTarget>
                   | "contrastCheck" <color> <color> | "contrastCheck" <name> <role> <role>
                   | "css" <name>
                   | "print" <name>
 
     <transform> -> "shade" | "tint" | "complementary" | "tertiary" | "analogous" | "triadic"
     <target> -> <color> | <name>
+    <updateTarget> -> <color | <role>
+    <assignTarget> -> <color> | <transform> <target>
     <mode> -> "hex" | "rgb" | "hsl"
 
-    <name> -> <String>
-    <role> -> <String>
-    <String> -> <char> | <char> <String>
+    <name> -> <identifier>
+    <role> -> <identifier>
+    <identifier> -> <letter> { <letter> | <digit> | "-" }
     
     <entries> -> <entry> | <entry> "," <entries>
     <entry> -> <color> | <role> ":" <color>
@@ -35,10 +37,11 @@
     <rgb> -> "(" <ℤ+> "," <ℤ+> "," <ℤ+> ")" | <ℤ+> "," <ℤ+> "," <ℤ+>
     <hsl> -> "(" <ℤ+> "," <ℤ+> "," <ℤ+> ")" | <ℤ+> "," <ℤ+> "," <ℤ+>
 
-    <hex> -> <hexDigit><hexDigit><hexDigit> | <hexDigit><hexDigit><hexDigit><hexDigit><hexDigit><hexDigit>
+    <hex> -> <hexDigit>{3} | <hexDigit>{6}
     <hexDigit> -> [0-9] | [a-f] | [A-F]
--}                 
+-}             
 import Syntax
+import Parser (runSwatch)
 
 --Example 1 - Palette creation
 {- 
@@ -68,6 +71,24 @@ example2 = [
     Transform Shade (Left (Hex "#aaa"))
             ]
 
+--Example 3 Utilizing Parser
+{-
+    create pantone2026 [Cloud-Dancer: #F0EEE9, Nantucket-Breeze: #BCCFE7, Cosmic-Sky: #AAABC2, Alaskan-Blue: #FFFFFF, Regatta: #5479B2]
+    update pantone2026 Alaskan-Blue #7BA7CE
+    convert hex rgb pantone2026
+    assign pantone2026 Alaskan-Complement complementary #5479B2
+    print pantone2026
+-}
+-- Haskell
+example3 :: String
+example3 = unlines[
+    "create pantone2026 [Cloud-Dancer: #F0EEE9, Nantucket-Breeze: #BCCFE7, Cosmic-Sky: #AAABC2, Alaskan-Blue: #FFFFFF, Regatta: #5479B2]",
+    "update pantone2026 Alaskan-Blue #7BA7CE",
+    "convert hex rgb pantone2026",
+    "assign pantone2026 Alaskan-Complement complementary #5479B2",
+    "print pantone2026"
+                   ]
+
 main :: IO ()
 main = do
     putStrLn "--- Swatch Demo ---"
@@ -77,3 +98,8 @@ main = do
     
     putStrLn "\nExample 2 - Accessibility Aid:"
     mapM_ print example2
+
+    putStrLn "\nExample 3 - Utilizing Parser:"
+    case runSwatch example3 of
+        Left err -> putStrLn $ "Parser Error: " ++ show err
+        Right program -> mapM_ (putStrLn . show) program
