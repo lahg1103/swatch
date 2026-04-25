@@ -62,9 +62,21 @@ data Statement = Create Name [Entry]
                 | CSS Name
                 | Print Name
 
-data Entry = ColorEntry Color | RoleEntry Role Color
-data Color = Hex String | RGB Value Value Value | HSL Value Value Value
+data HexV = Zero | One | Two | Three | Four | Five | Six | Seven | Eight | None | La | UA | Lb | UB
+type Env = [(Name, [Entry])]
 
+instance Show HexV where
+    show Zero = "0"
+    show La = "a"
+    show UA = "A"
+
+instance Show HexString where
+    show (Three r g b) = show r ++ show g ++ show b
+    show (Six r1 r2 g1 g2 b1 b2) = undefined
+
+data Entry = ColorEntry Color | RoleEntry Role Color
+data Color = Hex HexString | RGB Value Value Value | HSL Value Value Value
+data HexString = Three HexV HexV HexV | Six HexV HexV HexV HexV HexV HexV
 data Transform = Shade | Tint | Complementary | Tertiary | Analogous | Triadic
 data Target = ColorTarget Color | NameTarget Name
 

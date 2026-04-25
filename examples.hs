@@ -103,3 +103,9 @@ main = do
     case runSwatch example3 of
         Left err -> putStrLn $ "Parser Error: " ++ show err
         Right program -> mapM_ (putStrLn . show) program
+
+
+{-
+data Either a b = Left a | Right b
+
+-}
