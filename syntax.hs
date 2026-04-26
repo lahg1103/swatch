@@ -62,21 +62,40 @@ data Statement = Create Name [Entry]
                 | CSS Name
                 | Print Name
 
-data HexV = Zero | One | Two | Three | Four | Five | Six | Seven | Eight | None | La | UA | Lb | UB
+data HexV = Zero | One | Two | Three | Four | Five | Six | Seven | Eight | Nine | La | UA | Lb | UB | Lc | UC | Ld | UD | Le | UE | Lf | UF
 type Env = [(Name, [Entry])]
 
 instance Show HexV where
     show Zero = "0"
+    show One = "1"
+    show Two = "2"
+    show Three = "3"
+    show Four = "4"
+    show Five = "5"
+    show Six = "6"
+    show Seven = "7"
+    show Eight = "8"
+    show Nine = "9"
     show La = "a"
     show UA = "A"
+    show Lb = "b"
+    show UB = "B"
+    show Lc = "c"
+    show UC = "C"
+    show Ld = "d"
+    show UD = "D"
+    show Le = "e"
+    show UE = "E"
+    show Lf = "f"
+    show UF = "F"
 
 instance Show HexString where
-    show (Three r g b) = show r ++ show g ++ show b
-    show (Six r1 r2 g1 g2 b1 b2) = undefined
+    show (Hex3 v1 v2 v3) = show v1 ++ show v2 ++ show v3
+    show (Hex6 v1 v2 v3 v4 v5 v6) = show v1 ++ show v2 ++ show v3 ++ show v4 ++ show v5 ++ show v6
 
 data Entry = ColorEntry Color | RoleEntry Role Color
 data Color = Hex HexString | RGB Value Value Value | HSL Value Value Value
-data HexString = Three HexV HexV HexV | Six HexV HexV HexV HexV HexV HexV
+data HexString = Hex3 HexV HexV HexV | Hex6 HexV HexV HexV HexV HexV HexV
 data Transform = Shade | Tint | Complementary | Tertiary | Analogous | Triadic
 data Target = ColorTarget Color | NameTarget Name
 
@@ -105,7 +124,7 @@ instance Show Statement where
     show (Print n) = "print " ++ n
 
 instance Show Color where
-    show (Hex s) = "#" ++ filter (/= '#') s
+    show (Hex s) = "#" ++ show s
     show (RGB r g b) = "rgb(" ++ show r ++ "," ++ show g ++ "," ++ show b ++ ")"
     show (HSL h s l) = "hsl(" ++ show h ++ "," ++ show s ++ "," ++ show l ++ ")"
 
