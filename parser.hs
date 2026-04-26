@@ -125,14 +125,29 @@ parseEntry = try roleEntry <|> colorEntry
                 colorEntry = ColorEntry <$> parseColor
 
 parseColor :: Parser Color
-parseColor = parseHex <|> parseRGB <|> parseHSL
+parseColor = try parseHex <|> parseRGB <|> parseHSL
 
 parseHex :: Parser Color
 parseHex = do
            symbol "#"
-           h <- many1 (satisfy isHexDigit)
-           return $ Hex h
-
+           digits <- many1 (satisfy isHexDigit)
+           case digits of
+            [d1, d2, d3] ->
+              return $ Hex (Hex3 (toHV d1) (toHV d2) (toHV d3))
+            [d1, d2, d3, d4, d5, d6] ->
+              return $ Hex (Hex6 (toHV d1) (toHV d2) (toHV d3) (toHV d4) (toHV d5) (toHV d6))
+            _ -> fail "Hex color must be exactly 3 or 6 digits"
+          where
+            toHV '0' = Zero; toHV '1' = One; toHV '2' = Two; toHV '3' = Three;
+            toHV '4' = Four; toHV '5' = Five; toHV '6' = Six; toHV '7' = Seven;
+            toHV '8' = Eight; toHV '9' = Nine;
+            toHV 'a' = La; toHV 'A' = UA;
+            toHV 'b' = Lb; toHV 'B' = UB;
+            toHV 'c' = Lc; toHV 'C' = UC;
+            toHV 'd' = Ld; toHV 'D' = UD;
+            toHV 'e' = Le; toHV 'E' = UE;
+            toHV 'f' = Lf; toHV 'F' = UF;
+            toHV _ = error "Invalid hex digit"
 parseRGB :: Parser Color
 parseRGB = do
            reserved "rgb"

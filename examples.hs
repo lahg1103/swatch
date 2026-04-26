@@ -42,6 +42,7 @@
 -}             
 import Syntax
 import Parser (runSwatch)
+import Text.Parsec (ParseError)
 
 --Example 1 - Palette creation
 {- 
@@ -52,8 +53,8 @@ import Parser (runSwatch)
 -- Haskell
 example1 :: Program
 example1 = [
-    Create "Greyscale" [RoleEntry "Foreground" (Hex "000"), ColorEntry (Hex "ccc"), RoleEntry "Background" (Hex "eee")],
-    Add "Greyscale" (Hex "fff"),
+    Create "Greyscale" [RoleEntry "Foreground" (Hex (Hex3 Zero Zero Zero)), ColorEntry (Hex (Hex3 UC UC UC)), RoleEntry "Background" (Hex (Hex3 Le Le Le))],
+    Add "Greyscale" (Hex (Hex3 Lf Lf Lf)),
     CSS "Greyscale"
             ]
 
@@ -66,9 +67,9 @@ example1 = [
 -- Haskell
 example2 :: Program
 example2 = [
-    Create "Palette" [RoleEntry "Text" (Hex "eee"), RoleEntry "Paper" (Hex "#aaa")],
+    Create "Palette" [RoleEntry "Text" (Hex (Hex3 UE UE Le)), RoleEntry "Paper" (Hex (Hex3 La UA UA))],
     ContrastCheck (RolePair "Palette" "Text" "Paper"),
-    Transform Shade (Left (Hex "#aaa"))
+    Transform Shade (Left (Hex (Hex3 La La La)))
             ]
 
 --Example 3 Utilizing Parser
