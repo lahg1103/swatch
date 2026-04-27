@@ -170,6 +170,17 @@ hslToRGB (HSLDouble h s l) = (round ((r + m) * 255), round ((g + m) * 255), roun
             | 240 <= h && h < 300 = (x, 0, c)
             | otherwise = (c, 0, x)
 
+rgbToHex :: (Int, Int, Int) -> Color
+rgbToHex (r, g, b) = Hex (Hex6 r1 r2 g1 g2 b1 b2)
+    where
+    -- breaks R G B values into two 4-bit nibbles (Result is 6 digit hex, I'm not bothering with 3 digit here)
+        r1 = integerToHexValue (r `div` 16)
+        r2 = integerToHexValue (r `mod` 16)
+        g1 = integerToHexValue (g `div` 16)
+        g2 = integerToHexValue (g `mod` 16)
+        b1 = integerToHexValue (b `div` 16)
+        b2 = integerToHexValue (b `mod` 16)
+
 --
 
 --
@@ -182,11 +193,13 @@ hslToRGB (HSLDouble h s l) = (round ((r + m) * 255), round ((g + m) * 255), roun
 
 --everything to HSLDouble
 colorToHSL :: Color -> HSLDouble
---hex to HSLDouble using Hex -> RGB -> HSL o yea
-colorToHSL (Hex h) = rgbToHSL (hexToRGB h)
---hsl 0-100 to HSLDouble
+-- hsl 0-100 to HSLDouble
 colorToHSL (HSL h s l) = fromHSL (fromIntegral h) (fromIntegral s) (fromIntegral l)
---rgb to HSLDouble (I want to avoid using the rgbToHSL when writing examples)
+
+-- hex to HSLDouble using Hex -> RGB -> HSL o yea
+colorToHSL (Hex h) = rgbToHSL (hexToRGB h)
+
+-- rgb to HSLDouble (I want to avoid using the rgbToHSL when writing examples)
 colorToHSL (RGB r g b) = rgbToHSL (r, g, b)
 
 
@@ -194,20 +207,30 @@ colorToHSL (RGB r g b) = rgbToHSL (r, g, b)
 colorToRGB :: Color -> (Int, Int, Int)
 -- rgb to rgb. Yes.
 colorToRGB (RGB r g b) = (r, g, b)
+
 -- hex
 colorToRGB (Hex h) = hexToRGB h
+
 -- this one is painful to look at, but I think this is the easiest way to standardize the input
 colorToRGB (HSL h s l) = hslToRGB (colorToHSL (HSL h s l))
 
 --everything to Hex
 colorToHex :: Color -> Color
-colorToHex c =
-    let (r, g, b) = colorToRGB c 
-    -- breaks R G B values into two 4-bit nibbles (Result is 6 digit hex, I'm not bothering with 3 digit here)
-        r1 = integerToHexValue (r `div` 16)
-        r2 = integerToHexValue (r `mod` 16)
-        g1 = integerToHexValue (r `div` 16)
-        g2 = integerToHexValue (r `mod` 16)
-        b1 = integerToHexValue (r `div` 16)
-        b2 = integerToHexValue (r `mod` 16)
-    in Hex (Hex6 r1 r2 g1 g2 b1 b2)
+-- hex to hex (force 6 digit hex)
+colorToHex (Hex h) = Hex h
+
+-- rgb
+colorToHex (RGB r g b) = rgbToHex (r, g, b)
+
+-- hsl
+colorToHex (HSL h s l) = rgbToHex (colorToRGB (HSL h s l))
+
+
+--
+
+--
+
+--
+
+-- color math : transformations
+
