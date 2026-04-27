@@ -40,6 +40,18 @@ evaluateStmt (Update name target newColor) env =
         -- if no match:
         updateEntry _ _ entry = entry
 
+--remove whole palette
+evaluateStmt (Remove name Nothing) env =
+    filter (\(n, _)-> n /= name) env
+
+--remove specific color
+evaluateStmt (Remove name (Just target)) env =
+    let entries = findPalette name env
+        newEntries = filter (\entry -> case entry of
+            ColorEntry c -> c /= target
+            RoleEntry _ c -> c /= target) entries
+    in replacePalette name newEntries env
+
 
 -- color conversion
 
@@ -52,11 +64,71 @@ evaluateStmt (Convert _ HexMode (Left color)) env =
     let hexColor = colorToHex color
     in trace (" Converted " ++ show color ++ " to Hex: " ++ show hexColor ++ "*/") env
 
+evaluateStmt (Convert _ mode target) env =
+    case target of
+        -- single color
+        Left c -> 
+            let converted = convertToMode mode c
+            in trace ("Converted color: " ++ show converted ++ "\n") env
+            
+        -- entire palette
+        Right name ->
+            let entries = findPalette name env
+                -- Map the conversion over every entry in the palette
+                newEntries = map (\entry -> case entry of
+                    ColorEntry c -> ColorEntry (convertToMode mode c)
+                    RoleEntry r c -> RoleEntry r (convertToMode mode c)) entries
+            in replacePalette name newEntries env
+
+evaluateStmt (Print name) env =
+    let entries = findPalette name env
+        formatted = unlines $ map (\e -> " " ++ show e) entries
+    in trace ("\n Palette: " ++ name ++ "\n" ++ formatted) env
+
 evaluateStmt (CSS name) env =
     let entries = findPalette name env
         output = "CSS output for " ++ name ++ "\n" ++ 
                 ":root {\n" ++ formatCSS name entries ++ "}"
     in trace output env
+
+
+-- transform
+
+evaluateStmt (Transform trans target) env = 
+    let colors = resolveTarget target env
+        results = applyTransform trans colors
+    in trace (show trans ++ " result: " ++ show results ) env
+
+
+-- contrast check
+
+evaluateStmt (ContrastCheck target) env =
+    let (c1, c2) = case target of 
+            ColorPair a b -> (a, b)
+            RolePair name r1 r2 ->
+                let entries = findPalette name env
+                    findRole r = head [c | RoleEntry role c <- entries, role == r]
+                in (findRole r1, findRole r2)
+        ratio = calculateContrast c1 c2
+        status = if ratio > 4.5 then "PASS (AA)" else "FAIL"
+    in trace ("Contrast Ratio for " ++ show c1 ++ " and " ++ show c2 ++ ": " ++ show (fromIntegral (round (ratio * 100)) / 100.0) ++ " : 1 [" ++ status ++ "]\n") env
+
+
+-- assign
+
+evaluateStmt (Assign name role target) env = 
+    let entries = findPalette name env
+        newColors = case target of
+            Direct c -> [c]
+            Computed trans t -> applyTransform trans (resolveTarget t env)
+        
+        -- create new entries to palette
+        newEntries = case newColors of
+            [single] -> [RoleEntry role single]
+            multiple -> zipWith (\i c -> RoleEntry (role ++ "-" ++ show i) c) [1..] multiple
+            
+    in replacePalette name (entries ++ newEntries) env
+
 
 
 --
@@ -86,6 +158,38 @@ formatCSS paletteName entries = concatMap formatEntry (zip [1..] entries)
         formatEntry (_, RoleEntry role c) =
             " --" ++ role ++ ": " ++ show c ++ ";\n"
 
+resolveTarget :: Either Color Name -> Env -> [Color]
+resolveTarget (Left c) _ = [c]
+resolveTarget (Right name) env =
+    map (\entry -> case entry of ColorEntry c -> c; RoleEntry _ c -> c) (findPalette name env)
+
+applyTransform :: Transform -> [Color] -> [Color]
+applyTransform trans colors = concatMap go colors
+    where
+        go c = case trans of
+            Shade -> [hslDoubleToColor (colorToShade (colorToHSL c))]
+            Tint -> [hslDoubleToColor (colorToTint (colorToHSL c))]
+            Complementary -> [hslDoubleToColor (colorToComplementary (colorToHSL c))]
+            Tertiary -> [hslDoubleToColor (colorToTertiary (colorToHSL c))]
+            Analogous -> colorToAnalogous c
+            Triadic -> colorToTriadic c
+
+-- contrast check
+-- formula from WCAG
+
+calculateContrast :: Color -> Color -> Double
+calculateContrast c1 c2 =
+    let l1 = luminance c1
+        l2 = luminance c2
+    in (max l1 l2 + 0.05) / (min l1 l2 + 0.05)
+
+-- apparently luminance used for the WCAG formula is different from the l in hsl.... :((
+luminance :: Color -> Double
+luminance c =
+    let (r, g, b) = colorToRGB c
+        [dr, dg, db] = map (\v -> fromIntegral v / 255) [r, g, b]
+    in 0.2126 * dr + 0.7152 * dg + 0.0722 * db
+        
 
 --
 
@@ -155,6 +259,15 @@ integerToHexValue n = case n of
 fmod :: Double -> Double -> Double
 fmod a b = a - b * fromIntegral (floor (a / b))
 
+
+--convert a color to specific mode
+convertToMode :: Mode -> Color -> Color
+convertToMode HexMode c = colorToHex c
+convertToMode RGBMode c = 
+    let (r, g, b) = colorToRGB c
+    in RGB r g b
+convertToMode HSLMode c =
+    hslDoubleToColor (colorToHSL c)
 
 
 -- 
@@ -295,14 +408,14 @@ colorToShade :: HSLDouble -> HSLDouble
 colorToShade (HSLDouble h s l) =
         -- turn hsl lightness down by 10%, hue shift by -5 deg, saturation up by 8%
         -- modulus in case a color shifts past 0 deg or 360 deg
-        HSLDouble ( fmod (h - 5) 360) (min 1.0 (s + 0.08)) (max 0.0 (l - 0.10))
+        HSLDouble ( fmod (h - 5) 360) (min 1.0 (s + 0.08)) (max 0.0 (l - 0.30))
 
 
 -- tint - tints are lighter versions of the color
 colorToTint :: HSLDouble -> HSLDouble
 colorToTint (HSLDouble h s l) = 
         -- turn hsl lightness up by 10%, hue shift by 5 deg, saturation down by 8%
-        HSLDouble (fmod (h + 5) 360) (max 0.0 (s - 0.08)) (min 1.0 (l + 0.10))
+        HSLDouble (fmod (h + 5) 360) (max 0.0 (s - 0.08)) (min 1.0 (l + 0.30))
 
 
 -- complementary - complementary colors are opposite on the color wheel

@@ -68,9 +68,11 @@ example1 = [
 -- Haskell
 example2 :: Program
 example2 = [
-    Create "Palette" [RoleEntry "Text" (Hex (Hex3 UE UE Le)), RoleEntry "Paper" (Hex (Hex3 La UA UA))],
+    Create "Palette" [RoleEntry "Paper" (Hex (Hex3 UE UE Le)), RoleEntry "Text" (Hex (Hex3 La UA UA))],
     ContrastCheck (RolePair "Palette" "Text" "Paper"),
-    Transform Shade (Left (Hex (Hex3 La La La)))
+    Assign "Palette" "Text" (Computed Shade (Right "Palette")),
+    ContrastCheck (RolePair "Palette" "Text-2" "Paper"),
+    Convert HexMode HexMode (Right "Palette")
             ]
 
 --Example 3 Utilizing Parser
@@ -92,14 +94,11 @@ example3 = unlines[
                    ]
 
 -- Temporary Example
-example4 :: Program
-example4 = [
-    Create "Brand" [
-        ColorEntry (RGB 255 255 255),
-        RoleEntry "primary" (Hex (Hex3 UA UA UA)), 
-        ColorEntry (HSL 30 50 80)              
-    ],
-    CSS "Brand"
+fullTest :: [Statement]
+fullTest = [
+    Create "MyUI" [],
+    Assign "MyUI" "theme" (Computed Analogous (Left (RGB 255 0 0))),
+    Print "MyUI"
   ]
 
 main :: IO ()
@@ -107,18 +106,17 @@ main = do
     putStrLn "--- Swatch Demo ---"
 
     putStrLn "\nExample 1 - Palette Creation:"
-    mapM_ print example1
+    let e1 = evaluate (example1)
+    print e1
     
     putStrLn "\nExample 2 - Accessibility Aid:"
-    mapM_ print example2
+    let e2 = evaluate (example2)
+    print e2
 
     putStrLn "\nExample 3 - Utilizing Parser:"
     case runSwatch example3 of
         Left err -> putStrLn $ "Parser Error: " ++ show err
-        Right program -> mapM_ (putStrLn . show) program
-
-
-{-
-data Either a b = Left a | Right b
-
--}
+        Right program -> do
+            let parserExample = evaluate program
+            putStrLn "evaluated parsed program"
+            print parserExample
