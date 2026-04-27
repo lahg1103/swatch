@@ -63,6 +63,7 @@ data Statement = Create Name [Entry]
                 | Print Name
 
 data HexV = Zero | One | Two | Three | Four | Five | Six | Seven | Eight | Nine | La | UA | Lb | UB | Lc | UC | Ld | UD | Le | UE | Lf | UF
+    deriving (Eq)
 type Env = [(Name, [Entry])]
 
 instance Show HexV where
@@ -94,8 +95,11 @@ instance Show HexString where
     show (Hex6 v1 v2 v3 v4 v5 v6) = show v1 ++ show v2 ++ show v3 ++ show v4 ++ show v5 ++ show v6
 
 data Entry = ColorEntry Color | RoleEntry Role Color
+    deriving (Eq)
 data Color = Hex HexString | RGB Value Value Value | HSL Value Value Value
+    deriving (Eq)
 data HexString = Hex3 HexV HexV HexV | Hex6 HexV HexV HexV HexV HexV HexV
+    deriving (Eq)
 data Transform = Shade | Tint | Complementary | Tertiary | Analogous | Triadic
 data Target = ColorTarget Color | NameTarget Name
 

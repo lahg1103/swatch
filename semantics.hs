@@ -3,6 +3,7 @@ import Syntax
 import Debug.Trace (trace)
 import Data.List (elemIndex)
 import GHC.Exts.Heap (GenClosure(DoubleClosure))
+import Data.Text.Array (new)
 evaluate :: Program -> Env
 evaluate p = evaluateProg p []
 
@@ -10,6 +11,9 @@ evaluateProg :: [Statement] -> Env -> Env
 evaluateProg [] env = env
 evaluateProg (s : ss) env = let env' = evaluateStmt s env
                                 in evaluateProg ss env'
+
+
+-- CRUD
 
 evaluateStmt :: Statement -> Env -> Env
 evaluateStmt (Create name entries) env = 
@@ -22,11 +26,47 @@ evaluateStmt (Add name color) env =
         newEntries = entries ++ [ColorEntry color]
     in replacePalette name newEntries env
 
+evaluateStmt (Update name target newColor) env =
+    let entries = findPalette name env
+        updatedEntries = map (updateEntry target newColor) entries
+    in replacePalette name updatedEntries env
+    where
+        -- color
+        updateEntry (Left oldColor) new (ColorEntry c)
+            | c == oldColor = ColorEntry new
+        -- role 
+        updateEntry (Right targetRole) new (RoleEntry r c)
+            | r == targetRole = RoleEntry r new
+        -- if no match:
+        updateEntry _ _ entry = entry
+
+
+-- color conversion
+
+evaluateStmt (Convert _ RGBMode (Left color)) env =
+    let (r, g, b) = colorToRGB color
+        rgbColor = RGB r g b
+    in trace (" Converted " ++ show color ++ " to RGB: " ++ show rgbColor ++ "*/") env
+
+evaluateStmt (Convert _ HexMode (Left color)) env =
+    let hexColor = colorToHex color
+    in trace (" Converted " ++ show color ++ " to Hex: " ++ show hexColor ++ "*/") env
+
 evaluateStmt (CSS name) env =
     let entries = findPalette name env
-    in trace("/* CSS output for " ++ name ++ "*/\n" ++ show entries) env
+        output = "CSS output for " ++ name ++ "\n" ++ 
+                ":root {\n" ++ formatCSS name entries ++ "}"
+    in trace output env
+
+
+--
+
+
+--
+
 
 -- helper
+
 findPalette :: Name -> Env -> [Entry]
 findPalette n env = case lookup n env of
     Nothing -> error $ "Palette '" ++ n ++ "' not found."
@@ -37,6 +77,14 @@ replacePalette n newE [] = []
 replacePalette n newE ((name, entries) : rest)
     | n == name = (name, newE) : rest
     | otherwise = (name, entries) : replacePalette n newE rest
+
+formatCSS :: Name -> [Entry] -> String
+formatCSS paletteName entries = concatMap formatEntry (zip [1..] entries)
+    where
+        formatEntry (i, ColorEntry c) =
+            " --" ++ paletteName ++ "-" ++ show i ++ ": " ++ show c ++ ";\n"
+        formatEntry (_, RoleEntry role c) =
+            " --" ++ role ++ ": " ++ show c ++ ";\n"
 
 
 --
@@ -75,6 +123,12 @@ doubleToValue d = round (d * 255.0)
 -- Takes (0-360, 0-100, 0-100) and creates valid HSLDouble
 fromHSL :: Double -> Double -> Double -> HSLDouble
 fromHSL h s l = HSLDouble (fmod h 360 ) (s / 100) (l / 100)
+
+-- Takes HSLDouble and creates a Color
+hslDoubleToColor :: HSLDouble -> Color
+hslDoubleToColor (HSLDouble h s l) =
+    -- turn from decimal double to percent!
+    HSL (round h) (round (s * 100)) (round (l * 100))
 
 -- Takes (0-15) and creates a HexV
 integerToHexValue :: Int -> HexV
@@ -234,3 +288,51 @@ colorToHex (HSL h s l) = rgbToHex (colorToRGB (HSL h s l))
 
 -- color math : transformations
 
+-- <transform> -> "shade" | "tint" | "complementary" | "tertiary" | "analogous" | "triadic"
+
+-- shade - shades are darker versions of the color
+colorToShade :: HSLDouble -> HSLDouble
+colorToShade (HSLDouble h s l) =
+        -- turn hsl lightness down by 10%, hue shift by -5 deg, saturation up by 8%
+        -- modulus in case a color shifts past 0 deg or 360 deg
+        HSLDouble ( fmod (h - 5) 360) (min 1.0 (s + 0.08)) (max 0.0 (l - 0.10))
+
+
+-- tint - tints are lighter versions of the color
+colorToTint :: HSLDouble -> HSLDouble
+colorToTint (HSLDouble h s l) = 
+        -- turn hsl lightness up by 10%, hue shift by 5 deg, saturation down by 8%
+        HSLDouble (fmod (h + 5) 360) (max 0.0 (s - 0.08)) (min 1.0 (l + 0.10))
+
+
+-- complementary - complementary colors are opposite on the color wheel
+colorToComplementary :: HSLDouble -> HSLDouble
+colorToComplementary (HSLDouble h s l) =
+    -- spits out hex, so it's wrapper in colorToHex, but the math turns the hue 180 around, modulus in case it goes above 360, you know the drill
+    HSLDouble (fmod (h + 180) 360) s l
+
+
+-- tertiary - tertiary colors are one third of the way away on the color wheel,,, what?? between complementary and the color. that midpoint.
+colorToTertiary :: HSLDouble -> HSLDouble
+colorToTertiary (HSLDouble h s l) =
+    -- spits out hex, so it's wrapper in colorToHex, but the math turns the hue 120 around, modulus in case it goes above 360, you know the drill
+        HSLDouble (fmod (h + 60) 360) s l
+
+-- analogous - returns a color list of original color, +30deg tint, and -30deg shade
+colorToAnalogous :: Color -> [Color]
+colorToAnalogous c = 
+    let (HSLDouble h s l) = colorToHSL c
+        c1 = c
+        c2 = hslDoubleToColor (colorToTint (HSLDouble (fmod (h + 30) 360) s l ))
+        c3 = hslDoubleToColor (colorToShade (HSLDouble (fmod (h - 30) 360) s l ))
+    in [c1, c2, c3]
+
+
+-- triadic - returns a color list of original color, +120 deg, +240 deg
+colorToTriadic :: Color -> [Color]
+colorToTriadic c =
+    let (HSLDouble h s l) = colorToHSL c
+        c1 = c
+        c2 = hslDoubleToColor (HSLDouble (fmod (h + 120) 360) s l)
+        c3 = hslDoubleToColor (HSLDouble (fmod (h + 240) 360) s l)
+    in [c1, c2, c3]

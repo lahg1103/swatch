@@ -42,6 +42,7 @@
 -}             
 import Syntax
 import Parser (runSwatch)
+import Semantics
 import Text.Parsec (ParseError)
 
 --Example 1 - Palette creation
@@ -89,6 +90,17 @@ example3 = unlines[
     "assign pantone2026 Alaskan-Complement complementary #5479B2",
     "print pantone2026"
                    ]
+
+-- Temporary Example
+example4 :: Program
+example4 = [
+    Create "Brand" [
+        ColorEntry (RGB 255 255 255),
+        RoleEntry "primary" (Hex (Hex3 UA UA UA)), 
+        ColorEntry (HSL 30 50 80)              
+    ],
+    CSS "Brand"
+  ]
 
 main :: IO ()
 main = do
