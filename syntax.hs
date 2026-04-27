@@ -152,3 +152,10 @@ instance Show ContrastTarget where
 instance Show Entry where
     show (ColorEntry c) = show c
     show (RoleEntry r c) = show r ++ ": " ++ show c
+
+data HSLDouble = HSLDouble { hue :: Double, sat :: Double, light :: Double }
+instance Show HSLDouble where
+    show (HSLDouble h s l) = 
+        "HSL: " ++ show (round h) ++ ", "
+        ++ show (round (s * 100)) ++ "%, "
+        ++ show (round (l * 100)) ++ "%"
